@@ -213,6 +213,11 @@ class ConsoleView {
 // PeerController handles application flow, user commands, and coordinates View and Peer.
 // --- Design Pattern: Singleton ---
 // Ensures only one instance of the controller exists.
+// --- Design Principle: Dependency Inversion Principle (DIP) ---
+// Depends on abstractions (Command, ConsoleView, PersistenceService) rather than concrete classes directly.
+// --- Design Principle: Open/Closed Principle (OCP) ---
+// New commands can be added without modifying this class's main loop,
+// just by adding a new Command implementation and mapping it.
 class PeerController {
     private static volatile PeerController instance; // Volatile for thread safety
     private Peer peer; // Cannot be final, initialized later in start()
@@ -293,11 +298,11 @@ class ConnectCommand implements Command {
 
 class ListRemoteFilesCommand implements Command {
     private final Peer peer; // Made final
-    private final ConsoleView view; // Made final
+    // private final ConsoleView view; // Removed - Peer handles display
 
     public ListRemoteFilesCommand(Peer peer, ConsoleView view) {
         this.peer = peer;
-        this.view = view;
+        // this.view = view; // Removed
     }
 
     @Override
@@ -325,11 +330,11 @@ class DownloadFileCommand implements Command {
 
 class ListLocalFilesCommand implements Command {
      private final Peer peer; // Made final
-    private final ConsoleView view; // Made final
+    // private final ConsoleView view; // Removed - Peer handles display
 
     public ListLocalFilesCommand(Peer peer, ConsoleView view) {
         this.peer = peer;
-        this.view = view;
+        // this.view = view; // Removed
     }
     @Override
     public void execute() {
@@ -511,6 +516,11 @@ class PersistenceService {
  * --- Design Principle: Single Responsibility Principle (SRP) ---
  * Peer is now more focused on core P2P logic (server, connections, file ops),
  * delegating I/O to ConsoleView and persistence to PersistenceService.
+ * --- Design Pattern: Facade ---
+ * Provides a simplified interface (connectToPeer, listAvailableFiles, downloadFile, etc.)
+ * to the more complex underlying P2P operations (socket management, threading, protocol handling).
+ * --- Design Principle: Dependency Inversion Principle (DIP) ---
+ * Depends on abstractions (ConsoleView, PersistenceService) injected via the constructor.
  */
 class Peer {
     private final int port; // Made final
