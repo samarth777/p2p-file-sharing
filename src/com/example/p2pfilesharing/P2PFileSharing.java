@@ -385,7 +385,11 @@ class ExitCommand implements Command {
 
 // --- Basic Persistence Service ---
 // --- Design Principle: Single Responsibility Principle (SRP) ---
-// Handles loading/saving peer data.
+// Handles loading/saving peer data and download history.
+// --- Design Pattern: Repository (Conceptual) ---
+// Mediates between the domain (PeerController, Commands) and data mapping layers (JDBC/SQLite).
+// It provides a collection-like interface for accessing domain data (known peers, download history)
+// while abstracting the underlying data storage mechanism (SQLite database).
 class PersistenceService {
     private static final String DB_URL = "jdbc:sqlite:p2p_data.db"; // Database file
 
