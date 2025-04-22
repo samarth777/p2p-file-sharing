@@ -37,6 +37,7 @@ import java.util.Map;
 import java.util.NoSuchElementException; // Added for Iterator pattern
 import java.util.Scanner;
 import java.util.concurrent.CopyOnWriteArrayList;
+import javax.swing.SwingUtilities; // Import SwingUtilities
 
 // --- Design Principle: Interface Segregation (Conceptual) ---
 // Interfaces for commands define specific actions.
@@ -50,9 +51,15 @@ interface Command {
 public class P2PFileSharing {
     public static void main(String[] args) {
         // --- Design Pattern: Singleton ---
-        // Get the single instance of PeerController
-        PeerController controller = PeerController.getInstance();
-        controller.start();
+        // Get the single instance of PeerController - GUI will use this
+        // PeerController controller = PeerController.getInstance();
+        // controller.start(); // Don't start the console loop
+
+        // Launch the GUI instead
+        SwingUtilities.invokeLater(() -> {
+            P2PGui gui = new P2PGui();
+            gui.setVisible(true);
+        });
     }
 }
 
