@@ -31,8 +31,10 @@ import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
+import java.util.Iterator; // Added for Iterator pattern
 import java.util.List;
 import java.util.Map;
+import java.util.NoSuchElementException; // Added for Iterator pattern
 import java.util.Scanner;
 import java.util.concurrent.CopyOnWriteArrayList;
 
@@ -525,11 +527,14 @@ class PersistenceService {
  * to the more complex underlying P2P operations (socket management, threading, protocol handling).
  * --- Design Principle: Dependency Inversion Principle (DIP) ---
  * Depends on abstractions (ConsoleView, PersistenceService) injected via the constructor.
+ * --- Design Pattern: Iterator ---
+ * Implements Iterable<PeerConnection> to allow iterating over connected peers using the Iterator pattern.
  */
-class Peer {
+// Add Iterable<PeerConnection> to the class definition
+class Peer implements Iterable<PeerConnection> {
     private final int port; // Made final
     private final String sharedDirectory; // Made final
-    private final List<PeerConnection> connectedPeers; // Made final
+    private final List<PeerConnection> connectedPeers; // Made final and used by Iterator
     private final ConsoleView view; // Made final
     private final PersistenceService persistenceService; // Made final
 
@@ -549,6 +554,45 @@ class Peer {
             }
         }
     }
+
+    // --- Iterator Pattern Implementation ---
+    @Override
+    public Iterator<PeerConnection> iterator() {
+        return new PeerConnectionIterator(connectedPeers);
+    }
+
+    // Inner class implementing the Iterator interface for PeerConnection
+    private static class PeerConnectionIterator implements Iterator<PeerConnection> {
+        private final List<PeerConnection> peers;
+        private int currentIndex = 0;
+
+        public PeerConnectionIterator(List<PeerConnection> peers) {
+            // Create a defensive copy or use the thread-safe list directly
+            // Using the direct list is okay here as CopyOnWriteArrayList handles concurrent modifications during iteration.
+            this.peers = peers;
+        }
+
+        @Override
+        public boolean hasNext() {
+            return currentIndex < peers.size();
+        }
+
+        @Override
+        public PeerConnection next() {
+            if (!hasNext()) {
+                throw new NoSuchElementException("No more peer connections available.");
+            }
+            return peers.get(currentIndex++);
+        }
+
+        // Optional: Implement remove() if needed, otherwise leave as default (UnsupportedOperationException)
+        @Override
+        public void remove() {
+            throw new UnsupportedOperationException("Remove operation is not supported for this iterator.");
+        }
+    }
+    // --- End of Iterator Pattern Implementation ---
+
 
     /**
      * Start the server to listen for incoming connections
@@ -595,8 +639,9 @@ class Peer {
         }
 
 
-        // Avoid duplicate connections
-        for (PeerConnection existingConn : connectedPeers) {
+        // Avoid duplicate connections - using the iterator pattern here for demonstration
+        // for (PeerConnection existingConn : connectedPeers) { // Old way
+        for (PeerConnection existingConn : this) { // Using the iterator implicitly via enhanced for-loop
             Socket existingSocket = existingConn.getSocket();
             if (existingSocket.getInetAddress().getHostAddress().equals(ip) && existingSocket.getPort() == port) {
                 view.showMessage("Already connected to " + ip + ":" + port);
@@ -632,7 +677,28 @@ class Peer {
      * List all files available from connected peers (uses view now)
      */
     public void listAvailableFiles() {
+        // Pass the underlying list to the view method, or the view could use the iterator too
         view.showPeers(connectedPeers);
+        /* Example of using the iterator explicitly:
+        if (!connectedPeers.isEmpty()) {
+            view.showMessage("Available files from connected peers:");
+            int i = 0;
+            for (PeerConnection peerConn : this) { // Using the iterator
+                view.showMessage("Peer " + i + " (" + peerConn.getSocket().getInetAddress().getHostAddress() + ":" + peerConn.getSocket().getPort() + ")");
+                List<String> files = peerConn.getFiles();
+                 if (files == null || files.isEmpty()) {
+                    view.showMessage("  No files available (or list not retrieved yet)");
+                } else {
+                    for (String file : files) {
+                        view.showMessage("  " + file);
+                    }
+                }
+                i++;
+            }
+        } else {
+            view.showMessage("No peers connected.");
+        }
+        */
     }
 
     /**
@@ -653,7 +719,7 @@ class Peer {
             return;
         }
 
-        PeerConnection peerConnection = connectedPeers.get(peerIndex);
+        PeerConnection peerConnection = connectedPeers.get(peerIndex); // Direct access by index is still needed here
         Socket socket = peerConnection.getSocket();
         String peerIp = socket.getInetAddress().getHostAddress();
         int peerPort = socket.getPort();
@@ -812,14 +878,21 @@ class Peer {
     // Method to remove a disconnected peer - potentially called by PeerHandler or PeerConnection
     public synchronized void removePeerConnection(PeerConnection connection) {
         if (connection != null) {
-            connectedPeers.remove(connection);
-            view.showMessage("Peer disconnected: " + connection.getSocket().getInetAddress().getHostAddress());
-            try {
-                connection.close(); // Ensure resources are released
-            } catch (IOException e) {
-                view.showMessage("Error closing disconnected peer socket: " + e.getMessage());
+            boolean removed = connectedPeers.remove(connection); // Use the list's remove method
+            if (removed) {
+                view.showMessage("Peer disconnected: " + connection.getSocket().getInetAddress().getHostAddress());
+                try {
+                    connection.close(); // Ensure resources are released
+                } catch (IOException e) {
+                    view.showMessage("Error closing disconnected peer socket: " + e.getMessage());
+                }
             }
         }
+    }
+
+    // Added getter for the list if needed externally, though iterator is preferred
+    public List<PeerConnection> getConnectedPeers() {
+        return connectedPeers;
     }
 }
 
